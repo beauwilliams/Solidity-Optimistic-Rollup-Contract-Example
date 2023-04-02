@@ -1,22 +1,32 @@
+// SPDX-License-Identifier: BSD-4-Clause
+
 
 pragma solidity ^0.8.0;
 
 contract MerkleRootStorage {
-    bytes16 public merkleRootCompact;
-    mapping(bytes16 => bool) public verified;
-    bytes32 constant HASH_PREFIX = 0x1900;
-
-    function storeMerkleRoot(bytes32 _merkleRoot) public {
-        require(_merkleRoot != bytes32(0), "Merkle root cannot be zero");
-        bytes16 compact = bytes16(_merkleRoot);
-        require(!verified[compact], "Merkle root already verified");
-
-        merkleRootCompact = compact;
-        verified[compact] = true;
-        emit MerkleRootStored(compact);
+    constructor() {
+        sequencer = msg.sender;
     }
 
-    function verifyMerkleProof(bytes32[] memory leaves, bytes32[] memory proof) public view returns(bool[] memory) {
+    modifier onlySequencer() {
+        require(msg.sender == sequencer, "Only contract sequencer can call this function");
+        _;
+    }
+    address public sequencer;
+    bytes16 public merkleRootCompact;
+    mapping(bytes16 => bool) public verified;
+    bytes32 constant HASH_PREFIX = bytes32(uint256(6400));
+
+    function storeMerkleRoot(bytes16 _merkleRoot) public onlySequencer {
+        require(_merkleRoot != bytes16(0), "Merkle root cannot be zero");
+        require(!verified[_merkleRoot], "Merkle root already verified");
+
+        merkleRootCompact = _merkleRoot;
+        verified[_merkleRoot] = true;
+        emit MerkleRootStored(_merkleRoot);
+    }
+
+    function verifyMerkleProof(bytes16[] memory leaves, bytes16[] memory proof) public view returns(bool[] memory) {
         require(leaves.length == proof.length, "Arrays must be of the same length");
 
         bool[] memory results = new bool[](leaves.length);
@@ -26,6 +36,7 @@ contract MerkleRootStorage {
             hashed[i] = keccak256(abi.encodePacked(HASH_PREFIX, proof[i]));
         }
 
+        bytes16[] memory computedHashes = new bytes16[](leaves.length);
         for (uint256 i = 0; i < leaves.length; i++) {
             bytes32 computedHash = leaves[i];
 
@@ -37,7 +48,11 @@ contract MerkleRootStorage {
                 }
             }
 
-            bytes16 compact = bytes16(computedHash);
+            computedHashes[i] = bytes16(computedHash);
+        }
+
+        for (uint256 i = 0; i < computedHashes.length; i++) {
+            bytes16 compact = computedHashes[i];
             results[i] = verified[compact];
         }
 
