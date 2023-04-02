@@ -1,0 +1,7 @@
+exports.accounts = require("./accounts")
+exports.balance = require("./balance")
+exports.blockNumber = require("./block-number")
+exports.audit = require("./audit")
+//NOTE: We can use this to hook into hardhat and run circom compile when hardhat is compiled via npx harhat compile
+// exports.wallet = require("./wallet")
+// exports.compile = require("./compileCircomHook")
