@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: BSD-4-Clause
+// SPDX-License-Identifier: MIT
 
 
 pragma solidity ^0.8.0;
 
-contract MerkleRootStorage {
+contract MerkleRootStorage16 {
     constructor() {
         sequencer = msg.sender;
     }

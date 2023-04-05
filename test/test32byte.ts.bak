@@ -1,0 +1,377 @@
+const { expect } = require("chai");
+import { ethers } from "hardhat";
+import { ethers as ethersjs } from "ethers";
+import { MerkleTree } from "merkletreejs";
+
+const MOCK_MERKLE_ROOT =
+  "0x0000000000000000000000000000000000000000000000000000000000000001";
+const MOCK_LEAVES = [
+  "0x0000000000000000000000000000000000000000000000000000000000000002",
+  "0x0000000000000000000000000000000000000000000000000000000000000003",
+  "0x0000000000000000000000000000000000000000000000000000000000000004",
+];
+const MOCK_PROOFS = [
+  "0x0000000000000000000000000000000000000000000000000000000000000005",
+  "0x0000000000000000000000000000000000000000000000000000000000000006",
+  "0x0000000000000000000000000000000000000000000000000000000000000007",
+];
+
+describe("MerkleRootStorage contract", function () {
+  let merkleRootStorage: any;
+
+  beforeEach(async () => {
+    const MerkleRootStorage = await ethers.getContractFactory(
+      "MerkleRootStorage32"
+    );
+    merkleRootStorage = await MerkleRootStorage.deploy();
+    await merkleRootStorage.deployed();
+  });
+
+  it("should store the merkle root correctly", async function () {
+    await merkleRootStorage.storeMerkleRoot(MOCK_MERKLE_ROOT);
+
+    expect(await merkleRootStorage.verified(MOCK_MERKLE_ROOT)).to.be.true;
+  });
+
+  it("should verify the merkle proof correctly", async function () {
+    await merkleRootStorage.storeMerkleRoot(MOCK_MERKLE_ROOT);
+
+    const results = await merkleRootStorage.verifyMerkleProof(
+      MOCK_LEAVES,
+      MOCK_PROOFS
+    );
+
+    expect(results).to.deep.equal([false, false, false]);
+  });
+
+  it("should not store a zero merkle root", async function () {
+    await expect(
+      merkleRootStorage.storeMerkleRoot(ethers.utils.hexZeroPad("0x", 32))
+    ).to.be.revertedWith("Merkle root cannot be zero");
+  });
+
+  it("should not store a merkle root that has already been verified", async function () {
+    await merkleRootStorage.storeMerkleRoot(MOCK_MERKLE_ROOT);
+
+    await expect(
+      merkleRootStorage.storeMerkleRoot(MOCK_MERKLE_ROOT)
+    ).to.be.revertedWith("Merkle root already verified");
+  });
+
+  it("should not verify a merkle proof with arrays of different lengths", async function () {
+    await expect(
+      merkleRootStorage.verifyMerkleProof(MOCK_LEAVES.slice(0, 2), MOCK_PROOFS)
+    ).to.be.revertedWith("Arrays must be of the same length");
+  });
+});
+
+/* describe("Batching transactions", function () {
+  let merkleRootStorage: any;
+  let contract: ethers.Contract;
+  let tx: any;
+
+  beforeEach(async () => {
+    const MerkleRootStorage = await ethers.getContractFactory("MerkleRootStorage32");
+    merkleRootStorage = await MerkleRootStorage.deploy();
+    await merkleRootStorage.deployed();
+
+    const TestContract = await ethers.getContractFactory("TestContract");
+    contract = await TestContract.deploy();
+    await contract.deployed();
+
+    const gasPrice = await ethers.provider.getGasPrice();
+    const totalGasLimit = 1000000;
+
+    tx = {
+      to: contract.address,
+      gasLimit: totalGasLimit,
+      gasPrice: gasPrice.mul(2),
+      data: ethers.utils.hexlify(
+        ethers.utils.defaultAbiCoder.encode(
+          ["uint256"],
+          [tx.gasLimit]
+        )
+      )
+    };
+  });
+
+  it("should store and verify a batch of transactions", async function () {
+    const leaves = [ethers.utils.keccak256(tx.data)];
+    const tree = new MerkleTree(leaves);
+    const root = tree.getRoot();
+
+    const proofs = tree.getProof(leaves[0]);
+    const proofBuffers = proofs.map(p => Buffer.from(p.slice(2), 'hex'));
+
+    const result = await batchAndStoreTransactions([tx], merkleRootStorage.address);
+    const events = result.events;
+
+    expect(events[0].event).to.equal("MerkleRootStored");
+    expect(events[0].args.root).to.equal(root);
+
+    const verificationResult = await merkleRootStorage.verifyMerkleProof(
+      leaves.map(l => l.slice(2)),
+      proofBuffers.map(p => p.toString('hex'))
+    );
+
+    expect(verificationResult[0]).to.be.true;
+  });
+}); */
+
+/* describe("MerkleRootStorage contract", function () {
+  let merkleRootStorage: ethers.Contract;
+  let blockOfTxs: any;
+
+  beforeEach(async () => {
+    const MerkleRootStorage = await ethers.getContractFactory(
+      "MerkleRootStorage32"
+    );
+    merkleRootStorage = await MerkleRootStorage.deploy();
+    await merkleRootStorage.deployed();
+
+    // Create a block of 10 transactions
+    blockOfTxs = [];
+    for (let i = 0; i < 10; i++) {
+      const targetAddress = ethers.utils.getAddress(
+        ethers.utils.hexlify(ethers.utils.randomBytes(20))
+      );
+      console.log(
+        ethers.utils.getAddress(
+          ethers.utils.hexlify(ethers.utils.randomBytes(20))
+        )
+      );
+
+      const value = ethers.utils.parseEther("1");
+      const data = "0x";
+      const gasLimit = 21000;
+      const tx = {
+        to: targetAddress,
+        value: value,
+        data: data,
+        gasLimit: gasLimit,
+      };
+      blockOfTxs.push(tx);
+    }
+  });
+
+  it("should store and verify a batch of transactions correctly", async function () {
+    // Encode the block of transactions using the Ethereum ABI encoding scheme
+    const encodedTxs = blockOfTxs.map((tx: any) => {
+      return ethers.utils.defaultAbiCoder.encode(
+        ["address", "uint256", "bytes", "uint256"],
+        [tx.to, tx.value, tx.data, tx.gasLimit]
+      );
+    });
+
+    // Create a Merkle tree from the encoded transactions
+    const leaves = encodedTxs.map((encodedTx: any) => {
+      return ethers.utils.keccak256(encodedTx);
+    });
+    const merkleTree = new MerkleTree(leaves);
+
+    // Calculate the Merkle root
+    const merkleRoot = merkleTree.getRoot();
+
+    // Store the Merkle root on the smart contract
+    await merkleRootStorage.storeMerkleRoot(merkleRoot);
+
+    // Verify the Merkle proof for each transaction in the block
+    for (let i = 0; i < 10; i++) {
+      const proof = merkleTree.getProof(leaves[i]);
+      const result = await merkleRootStorage.verifyMerkleProof(
+        [leaves[i]],
+        proof
+      );
+      expect(result[0]).to.equal(true);
+    }
+  });
+}); */
+
+/* describe("MerkleRootStorage contract", function () {
+  let merkleRootStorage: ethers.Contract;
+  let blockOfTxs: any;
+
+  beforeEach(async () => {
+    const MerkleRootStorage = await ethers.getContractFactory(
+      "MerkleRootStorage32"
+    );
+    merkleRootStorage = await MerkleRootStorage.deploy();
+    await merkleRootStorage.deployed();
+
+    // Create a block of 10 transactions
+    blockOfTxs = [];
+    for (let i = 0; i < 10; i++) {
+const targetAddress = ethers.Wallet.createRandom().address;
+
+      const value = ethers.utils.parseEther("1");
+      const data = "0x";
+      const gasLimit = 21000;
+      const tx = {
+        to: targetAddress,
+        value: value,
+        data: data,
+        gasLimit: gasLimit,
+      };
+      blockOfTxs.push(tx);
+    }
+  });
+
+  it("should store and verify a batch of transactions correctly", async function () {
+    // Encode the block of transactions using the Ethereum ABI encoding scheme
+    const encodedTxs = blockOfTxs.map((tx: any) => {
+      return ethers.utils.defaultAbiCoder.encode(
+        ["address", "uint256", "bytes", "uint256"],
+        [tx.to, tx.value, tx.data, tx.gasLimit]
+      );
+    });
+
+    // Create a Merkle tree from the encoded transactions
+    const leaves = encodedTxs.map((encodedTx: any) => {
+      return ethers.utils.keccak256(encodedTx);
+    });
+    const merkleTree = new MerkleTree(leaves);
+
+    // Calculate the Merkle root
+    const merkleRoot = merkleTree.getRoot();
+
+    // Store the Merkle root on the smart contract
+    await merkleRootStorage.storeMerkleRoot(merkleRoot);
+
+    // Verify the Merkle proof for each transaction in the block
+    const hexLeaves = leaves.map(leaf => ethers.utils.hexlify(leaf));
+    for (let i = 0; i < 10; i++) {
+      const proof = merkleTree.getProof(leaves[i]);
+      const hexProof = proof.map(p => ethers.utils.hexlify(p));
+      const result = await merkleRootStorage.verifyMerkleProof(
+        [hexLeaves[i]],
+        hexProof
+      );
+      expect(result[0]).to.equal(true);
+    }
+  });
+}); */
+
+describe("MerkleRootStorage contract", function () {
+  let merkleRootStorage: any;
+  let blockOfTxs: any;
+  let encodedTxs: any;
+  let merkleTree: any;
+  let leaves: any;
+  let merkleRoot: any;
+
+  beforeEach(async () => {
+    const MerkleRootStorage = await ethers.getContractFactory(
+      "MerkleRootStorage32"
+    );
+    merkleRootStorage = await MerkleRootStorage.deploy();
+    await merkleRootStorage.deployed();
+
+    // Create a block of 10 transactions
+    blockOfTxs = [];
+    for (let i = 0; i < 10; i++) {
+      const targetAddress = ethers.utils.getAddress(
+        ethers.utils.hexlify(ethers.utils.randomBytes(20))
+      );
+      const value = ethers.utils.parseEther("1");
+      const data = "0x";
+      const gasLimit = 21000;
+
+      const tx = {
+        to: targetAddress,
+        value: value,
+        data: data,
+        gasLimit: gasLimit,
+      };
+
+      blockOfTxs.push(tx);
+    }
+
+    // Encode the block of transactions using the Ethereum ABI encoding scheme
+    encodedTxs = blockOfTxs.map((tx: any) => {
+      const randomBytes = ethers.utils.arrayify(
+        ethers.utils.hexlify(ethers.utils.randomBytes(20))
+      );
+      const paddedRandomBytes = ethers.utils.hexZeroPad(randomBytes, 32);
+
+      return ethers.utils.defaultAbiCoder.encode(
+        ["address", "uint256", "bytes", "uint256", "bytes32"],
+        [tx.to, tx.value, tx.data, tx.gasLimit, paddedRandomBytes]
+      );
+    });
+
+    // Create a Merkle tree from the encoded transactions
+    leaves = encodedTxs.map((encodedTx: any) => {
+      return ethersjs.utils.keccak256(encodedTx);
+    });
+    merkleTree = new MerkleTree(leaves);
+
+    // Calculate the Merkle root
+    merkleRoot = merkleTree.getHexRoot();
+    console.log("root is ", merkleRoot);
+
+    // Store the Merkle root on the smart contract
+    await merkleRootStorage.storeMerkleRoot(merkleRoot);
+  });
+
+  it("batch should store and verify a batch of transactions correctly", async function () {
+    // for (let i = 0; i < 10; i++) {
+    const i = 1
+      const leaf = leaves[i];
+
+      console.log(`Leaf ${i}: ${leaf}`);
+
+      const proof = merkleTree.getHexProof(leaf);
+      console.log(`Proof ${i}: ${JSON.stringify(proof)}`);
+
+      if (!proof) {
+        console.log("Invalid proof");
+      } else {
+        const result = await merkleRootStorage.verifyMerkleProof([leaf], proof);
+        expect(result[0]).to.equal(true);
+      }
+    // }
+  });
+});
+
+const keccak = require("keccak");
+
+function keccakHash(data: any) {
+  return keccak("keccak256").update(data).digest();
+}
+const addr1 = "0xa54d3c09E34aC96807c1CC397404bF2B98DC4eFb";
+const addr2 = "0x8ba1f109551bd432803012645ac136ddd64dba72";
+
+const leaves = [
+  keccakHash(ethers.utils.defaultAbiCoder.encode(["address", "uint256", "uint256"], [addr1, 1000, 0])),
+  keccakHash(ethers.utils.defaultAbiCoder.encode(["address", "uint256", "uint256"], [addr2, 500, 1])),
+];
+
+
+const merkleTree = new MerkleTree(leaves, keccakHash);
+const merkleRoot = merkleTree.getHexRoot();
+const merkleProof = merkleTree.getProof(leaves[0]);
+console.log(merkleTree.verify(merkleProof, leaves[0], merkleRoot)) // true
+
+console.log("Merkle root:", merkleRoot);
+console.log("Merkle leaf:", leaves[0]);
+console.log("Merkle proof for the first leaf:", merkleProof);
+
+
+// const { MerkleTree } = require('merkletreejs')
+// const SHA256 = require('crypto-js/sha256')
+
+// const leaves = ['a', 'b', 'c'].map(x => keccakHash(x))
+/* const tree = new MerkleTree(leaves, keccakHash)
+const root = tree.getHexRoot()
+const leaf = leaves[0]
+const proof = tree.getProof(leaf)
+console.log(tree.verify(proof, leaf, root)) // true
+console.log(tree.verify(proof, leaf, root)) // true */
+
+
+
+/* const badLeaves = ['a', 'x', 'c'].map(x => SHA256(x))
+const badTree = new MerkleTree(badLeaves, SHA256)
+const badLeaf = SHA256('x')
+const badProof = badTree.getProof(badLeaf)
+console.log(badTree.verify(badProof, badLeaf, root)) // false */
