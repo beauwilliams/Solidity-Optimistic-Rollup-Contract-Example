@@ -1,45 +1,7 @@
-import { ethers as ethersjs } from "ethers";
-import { ethers } from "hardhat";
-interface Transaction {
-  target: string;
-  data: string;
-  value: string;
-  gasLimit: number;
-}
-
-interface BatchedTransactions {
-  batchedTxData: string[];
-  totalGasLimit: number;
-}
-
-async function batchTransactions(
-  transactions: Transaction[],
-  contract: ethersjs.Contract
-): Promise<BatchedTransactions> {
-  const provider = contract.provider!;
-  const gasPrice = await provider.getGasPrice();
-
-  const batchedTxData: string[] = [];
-  let totalGasLimit = 0;
-
-  for (const tx of transactions) {
-    const txData = ethersjs.utils.hexlify(
-      ethersjs.utils.concat([
-        ethersjs.utils.id("executeTransaction(address,uint256,bytes)"),
-        ethersjs.utils.defaultAbiCoder.encode(
-          ["address", "uint256", "bytes"],
-          [tx.target, tx.value, tx.data]
-        ),
-      ])
-    );
-    batchedTxData.push(txData);
-    totalGasLimit += tx.gasLimit;
-  }
-
-  return { batchedTxData, totalGasLimit };
-}
-
 const { expect } = require("chai");
+import { ethers } from "hardhat";
+import { batchTransactions } from '../src/sequencer'
+
 
 describe("Sequencer", function () {
   it("should batch and store transactions", async function () {
@@ -70,6 +32,8 @@ describe("Sequencer", function () {
       transactions,
       optimisticRollup
     );
+console.log('batchedTxData', batchedTxData)
+
     expect(batchedTxData.totalGasLimit).to.eq(200000);
   });
 });

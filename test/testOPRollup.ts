@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { StandardMerkleTree } from "@openzeppelin/merkle-tree";
+import { batchTransactions } from "../src/sequencer";
 
 //@USAGE: const leafHexlified = leaf.map(toBytes32);
 //@PARAM: array of leaves
@@ -19,9 +20,11 @@ describe("OptimisticRollup", function () {
   let tree: any;
   let leaf: any;
   let invalidLeaf: any;
+  //TODO: Implement hash prefix to prevent colisions
   const HASH_PREFIX = ethers.utils.hexZeroPad(ethers.utils.hexValue(42), 32);
 
   beforeEach(async function () {
+    const [owner, account1, account2] = await ethers.getSigners();
     /* tokenContract = await (await ethers.getContractFactory('IERC20Mock')).deploy();
     await tokenContract.deployed();
     await tokenContract.mint(rollupContract.address, 1000000); */
@@ -33,17 +36,28 @@ describe("OptimisticRollup", function () {
     const addr1 = "0xa54d3c09E34aC96807c1CC397404bF2B98DC4eFb";
     const addr2 = "0x8ba1f109551bd432803012645ac136ddd64dba72";
 
-    //Target, Value, Data
-    const txs = [
-      [addr1, 1000, 0],
-      [addr2, 500, 1],
+    //NOTE: Mock transactions for the L2 sequencer
+    const transactions = [
+      {
+        target: account1.address,
+        data: "0x",
+        value: "0",
+        gasLimit: 100000,
+      },
+      {
+        target: account2.address,
+        data: "0x",
+        value: "0",
+        gasLimit: 100000,
+      },
     ];
 
-    const treeData = StandardMerkleTree.of(txs, [
-      "address",
-      "uint256",
-      "uint256",
+    const batchedTxData = await batchTransactions(transactions, rollupContract);
+
+    const treeData = StandardMerkleTree.of(batchedTxData.batchedTxData, [
+      "bytes",
     ]);
+
     tree = treeData;
     invalidLeaf = "0x06";
 
@@ -67,6 +81,8 @@ describe("OptimisticRollup", function () {
       //NOTE: We hash the leaf equivalent to below solidity expression
       //bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(leaf[]))));
       const leafHashed = tree.leafHash(leaf);
+      console.log("leafHashed: ", leafHashed);
+
       const proof = tree.getProof(i);
       console.log("Index:", merkleRootIndex);
       console.log("Value:", v);
@@ -76,6 +92,7 @@ describe("OptimisticRollup", function () {
         proof,
         leafHashed
       );
+
       expect(verified).to.be.true;
     }
 
@@ -85,7 +102,7 @@ describe("OptimisticRollup", function () {
       leaf = tree.values[i].value;
       const verified = StandardMerkleTree.verify(
         tree.root,
-        ["address", "uint256", "uint256"],
+        ["bytes"],
         tree.values[i].value,
         proof
       );

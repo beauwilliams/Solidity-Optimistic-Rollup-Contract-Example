@@ -1,4 +1,44 @@
 import { ethers as ethersjs } from "ethers";
+interface Transaction {
+  target: string;
+  data: string;
+  value: string;
+  gasLimit: number;
+}
+
+export interface BatchedTransactions {
+  batchedTxData: string[][];
+  totalGasLimit: number;
+}
+
+export async function batchTransactions(
+  transactions: Transaction[],
+  contract: ethersjs.Contract
+): Promise<BatchedTransactions> {
+  const provider = contract.provider!;
+  const gasPrice = await provider.getGasPrice();
+
+  const batchedTxData: string[][] = [];
+  let totalGasLimit = 0;
+
+  for (const tx of transactions) {
+    const txData = ethersjs.utils.hexlify(
+      ethersjs.utils.concat([
+        ethersjs.utils.id("executeTransaction(address,uint256,bytes)"),
+        ethersjs.utils.defaultAbiCoder.encode(
+          ["address", "uint256", "bytes"],
+          [tx.target, tx.value, tx.data]
+        ),
+      ])
+    );
+    batchedTxData.push([txData]);
+    totalGasLimit += tx.gasLimit;
+  }
+
+  return { batchedTxData, totalGasLimit };
+}
+
+/* import { ethers as ethersjs } from "ethers";
 import { MerkleTree } from "merkletreejs";
 
 interface Transaction {
@@ -35,9 +75,9 @@ for (const tx of transactions) {
   );
   batchedTxData.push(txData);
   totalGasLimit += tx.gasLimit;
-}
+} */
 
-  /* const tx = {
+/* const tx = {
     to: contract.address,
     gasLimit: totalGasLimit,
     gasPrice: gasPrice.mul(2),
@@ -61,4 +101,3 @@ for (const tx of transactions) {
   const root = "0x" + tree.getHexRoot();
 
   await contract.storeMerkleRoot(root); */
-}

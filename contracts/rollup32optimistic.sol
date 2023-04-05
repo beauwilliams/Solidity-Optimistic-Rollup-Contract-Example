@@ -51,7 +51,6 @@ contract OptimisticRollup {
     event FraudProofResolved(uint256 indexed index, bool indexed success);
 
     // Submit a fraud proof
-    // Submit a fraud proof
     function submitFraudProof(
         uint256 _merkleRootIndex,
         bytes32[] calldata _merkleProof,
