@@ -20,6 +20,7 @@ export async function batchAndStoreTransactions(
   const gasPrice = await provider.getGasPrice();
 
   const batchedTxData: string[] = [];
+  //TODO: Total Gas Limit?
   let totalGasLimit = 0;
 
 for (const tx of transactions) {
@@ -36,7 +37,7 @@ for (const tx of transactions) {
   totalGasLimit += tx.gasLimit;
 }
 
-  const tx = {
+  /* const tx = {
     to: contract.address,
     gasLimit: totalGasLimit,
     gasPrice: gasPrice.mul(2),
@@ -59,5 +60,5 @@ for (const tx of transactions) {
   const tree = new MerkleTree(leafData);
   const root = "0x" + tree.getHexRoot();
 
-  await contract.storeMerkleRoot(root);
+  await contract.storeMerkleRoot(root); */
 }

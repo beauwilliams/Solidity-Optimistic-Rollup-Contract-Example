@@ -9,6 +9,8 @@ contract OptimisticRollup {
     // Storage for the Merkle roots
     mapping(uint256 => bytes32) public merkleRoots;
     uint256 public merkleRootIndex;
+    // Constant for the hash prefix //TODO: implement for security
+    bytes32 constant HASH_PREFIX = bytes32(uint256(42));
 
     event NewMerkleRoot(uint256 indexed index, bytes32 indexed merkleRoot);
 

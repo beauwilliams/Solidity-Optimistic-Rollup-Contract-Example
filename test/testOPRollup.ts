@@ -2,11 +2,14 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { StandardMerkleTree } from "@openzeppelin/merkle-tree";
 
-
 //@USAGE: const leafHexlified = leaf.map(toBytes32);
 //@PARAM: array of leaves
 function toBytes32(value: any) {
   return ethers.utils.hexZeroPad(ethers.utils.hexlify(value), 32);
+}
+
+function prefixAndHash(leaf: any, HASH_PREFIX: any) {
+  return ethers.utils.keccak256(ethers.utils.concat([HASH_PREFIX, leaf]));
 }
 
 describe("OptimisticRollup", function () {
@@ -16,6 +19,7 @@ describe("OptimisticRollup", function () {
   let tree: any;
   let leaf: any;
   let invalidLeaf: any;
+  const HASH_PREFIX = ethers.utils.hexZeroPad(ethers.utils.hexValue(42), 32);
 
   beforeEach(async function () {
     /* tokenContract = await (await ethers.getContractFactory('IERC20Mock')).deploy();
@@ -29,7 +33,7 @@ describe("OptimisticRollup", function () {
     const addr1 = "0xa54d3c09E34aC96807c1CC397404bF2B98DC4eFb";
     const addr2 = "0x8ba1f109551bd432803012645ac136ddd64dba72";
 
-    //Sender, amount, nonce
+    //Target, Value, Data
     const txs = [
       [addr1, 1000, 0],
       [addr2, 500, 1],
@@ -63,7 +67,6 @@ describe("OptimisticRollup", function () {
       //NOTE: We hash the leaf equivalent to below solidity expression
       //bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(leaf[]))));
       const leafHashed = tree.leafHash(leaf);
-
       const proof = tree.getProof(i);
       console.log("Index:", merkleRootIndex);
       console.log("Value:", v);
